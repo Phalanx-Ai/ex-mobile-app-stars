@@ -1,17 +1,29 @@
 {
   "type": "object",
-  "title": "extractor configuration",
+  "title": "Parameters",
   "required": [
-    "print_hello"
+    "username",
+    "#password",
+    "hostname",
+    "applications"
   ],
   "properties": {
-    "print_hello": {
-      "type": "boolean",
-      "title": "Print Hello"
+    "username": {
+      "type": "string",
+      "title": "Sirius' Username "
     },
-    "debug": {
-      "type": "boolean",
-      "title": "Debug"
+    "#password": {
+      "type": "string",
+      "format": "password",
+      "title": "Sirius' Password"
+    },
+    "hostname": {
+      "type": "string",
+      "title": "Sirius' Hostname"
+    },
+    "applications": {
+      "type": "string",
+      "title": "ID of applications (comma separated)"
     }
   }
 }
