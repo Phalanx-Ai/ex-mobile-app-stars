@@ -103,7 +103,7 @@ class Component(ComponentBase):
             for r in app['ratings']:
                 records.append({
                     'platform': app['app']['platform'],
-                    'app-name': app['app']['label'],
+                    'app_name': app['app']['label'],
                     'date': r['date'],
                     'stars1': r['stars1'],
                     'stars2': r['stars2'],
@@ -115,7 +115,7 @@ class Component(ComponentBase):
         result_filename = self.configuration.tables_output_mapping[0]['source']
         table = self.create_out_table_definition(
             result_filename,
-            primary_key=['app-name', 'platform', 'date']
+            primary_key=['app_name', 'platform', 'date']
         )
 
         with open(table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
