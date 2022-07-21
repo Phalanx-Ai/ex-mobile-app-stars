@@ -1,77 +1,125 @@
-'''
-Template Component main class.
-
-'''
 import csv
 import logging
+import requests
+import json
+import sys
 from datetime import datetime
 
 from keboola.component.base import ComponentBase
 from keboola.component.exceptions import UserException
 
 # configuration variables
-KEY_API_TOKEN = '#api_token'
-KEY_PRINT_HELLO = 'print_hello'
+KEY_USERNAME = 'username'
+KEY_PASSWORD = '#password'
+KEY_SERVER_HOSTNAME = 'hostname'
+KEY_APPLICATIONS = 'applications'
 
-# list of mandatory parameters => if some is missing,
-# component will fail with readable message on initialization.
-REQUIRED_PARAMETERS = [KEY_PRINT_HELLO]
+REQUIRED_PARAMETERS = [KEY_USERNAME, KEY_PASSWORD, KEY_APPLICATIONS, KEY_SERVER_HOSTNAME]
 REQUIRED_IMAGE_PARS = []
+
+DATE_FROM = '2000-01-01'
+
+def login(email, password, hostname):
+    response = requests.request(
+        "POST",
+        "https://%s/api/token/new" % (hostname),
+        data=dict(
+            email=email,
+            password=password,
+        )
+    )
+
+    if not response.status_code == 200:
+        logging.error("Unable to login to Sirius API")
+        sys.exit(1)
+
+    return json.loads(response.text)
+
+def get_data(token, hostname, params):
+    response = requests.request(
+        "GET",
+        "https://%s/api/dashboard/getRatingsInTime" % (hostname),
+        params=params,
+        headers={
+            'Content-Type': "application/json",
+            'cache-control': "no-cache",
+            "Authorization": "Bearer " + token["access"],
+        }
+    )
+
+    if not response.status_code == 200:
+        logging.error("Unable to post data: %s" % (response.text))
+        sys.exit(2)
+
+    return response
 
 
 class Component(ComponentBase):
-    """
-        Extends base class for general Python components. Initializes the CommonInterface
-        and performs configuration validation.
-
-        For easier debugging the data folder is picked up by default from `../data` path,
-        relative to working directory.
-
-        If `debug` parameter is present in the `config.json`, the default logger is set to verbose DEBUG mode.
-    """
-
     def __init__(self):
         super().__init__()
 
     def run(self):
-        '''
-        Main execution code
-        '''
-
-        # ####### EXAMPLE TO REMOVE
-        # check for missing configuration parameters
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
-        # Access parameters in data/config.json
-        if params.get(KEY_PRINT_HELLO):
-            logging.info("Hello World")
 
-        # get last state data/in/state.json from previous run
-        previous_state = self.get_state_file()
-        logging.info(previous_state.get('some_state_parameter'))
+        if len(self.configuration.tables_output_mapping) != 1:
+            logging.error("Output table mapping with one entry is required")
+            sys.exit(1)
 
-        # Create output table (Tabledefinition - just metadata)
-        table = self.create_out_table_definition('output.csv', incremental=True, primary_key=['timestamp'])
+        token = login(
+            params[KEY_USERNAME],
+            params[KEY_PASSWORD],
+            params[KEY_SERVER_HOSTNAME]
+        )
 
-        # get file path of the table (data/out/tables/Features.csv)
-        out_table_path = table.full_path
-        logging.info(out_table_path)
+        applications = params[KEY_APPLICATIONS].split(",")
 
-        # DO whatever and save into out_table_path
+        resp_google = get_data(
+            token,
+            params[KEY_SERVER_HOSTNAME],
+            {
+                'application': applications,
+                'dateFrom': DATE_FROM,
+                'platform': 'google'
+            }
+        )
+        ratings_google = json.loads(resp_google.text).get('ratings')
+
+        resp_apple = get_data(
+            token,
+            params[KEY_SERVER_HOSTNAME],
+            {
+                'application': applications,
+                'dateFrom': DATE_FROM,
+                'platform': 'apple'
+            }
+        )
+        ratings_apple = json.loads(resp_apple.text).get('ratings')
+
+        records = []
+        for app in ratings_apple + ratings_google:
+            for r in app['ratings']:
+                records.append({
+                    'platform': app['app']['platform'],
+                    'app-name': app['app']['label'],
+                    'date': r['date'],
+                    'stars1': r['stars1'],
+                    'stars2': r['stars2'],
+                    'stars3': r['stars3'],
+                    'stars4': r['stars4'],
+                    'stars5': r['stars5']
+                })
+
+        result_filename = self.configuration.tables_output_mapping[0]['source']
+        table = self.create_out_table_definition(result_filename, incremental=True, primary_key=['app-name', 'platform', 'date'])
+
         with open(table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
-            writer = csv.DictWriter(out_file, fieldnames=['timestamp'])
+            writer = csv.DictWriter(out_file, fieldnames=['app-name', 'platform', 'date', 'stars1', 'stars2', 'stars3', 'stars4', 'stars5'])
             writer.writeheader()
-            writer.writerow({"timestamp": datetime.now().isoformat()})
+            writer.writerows(records)
 
-        # Save table manifest (output.csv.manifest) from the tabledefinition
         self.write_manifest(table)
-
-        # Write new state - will be available next run
-        self.write_state_file({"some_state_parameter": "value"})
-
-        # ####### EXAMPLE TO REMOVE END
-
 
 """
         Main entrypoint
