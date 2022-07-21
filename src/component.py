@@ -3,7 +3,6 @@ import logging
 import requests
 import json
 import sys
-from datetime import datetime
 
 from keboola.component.base import ComponentBase
 from keboola.component.exceptions import UserException
@@ -18,6 +17,7 @@ REQUIRED_PARAMETERS = [KEY_USERNAME, KEY_PASSWORD, KEY_APPLICATIONS, KEY_SERVER_
 REQUIRED_IMAGE_PARS = []
 
 DATE_FROM = '2000-01-01'
+
 
 def login(email, password, hostname):
     response = requests.request(
@@ -34,6 +34,7 @@ def login(email, password, hostname):
         sys.exit(1)
 
     return json.loads(response.text)
+
 
 def get_data(token, hostname, params):
     response = requests.request(
@@ -112,14 +113,21 @@ class Component(ComponentBase):
                 })
 
         result_filename = self.configuration.tables_output_mapping[0]['source']
-        table = self.create_out_table_definition(result_filename, incremental=True, primary_key=['app-name', 'platform', 'date'])
+        table = self.create_out_table_definition(
+            result_filename,
+            primary_key=['app-name', 'platform', 'date']
+        )
 
         with open(table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
-            writer = csv.DictWriter(out_file, fieldnames=['app-name', 'platform', 'date', 'stars1', 'stars2', 'stars3', 'stars4', 'stars5'])
+            writer = csv.DictWriter(
+                out_file,
+                fieldnames=['app-name', 'platform', 'date', 'stars1', 'stars2', 'stars3', 'stars4', 'stars5']
+            )
             writer.writeheader()
             writer.writerows(records)
 
         self.write_manifest(table)
+
 
 """
         Main entrypoint
