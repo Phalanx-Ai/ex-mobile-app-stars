@@ -121,7 +121,7 @@ class Component(ComponentBase):
         with open(table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
             writer = csv.DictWriter(
                 out_file,
-                fieldnames=['app-name', 'platform', 'date', 'stars1', 'stars2', 'stars3', 'stars4', 'stars5']
+                fieldnames=['app_name', 'platform', 'date', 'stars1', 'stars2', 'stars3', 'stars4', 'stars5']
             )
             writer.writeheader()
             writer.writerows(records)
